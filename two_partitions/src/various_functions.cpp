@@ -1,8 +1,6 @@
 /*
  * various_functions.cpp
  *
- *  Created on: January 23, 2018
- *      Author: Sameer
  *  
  */
 #include <RcppArmadillo.h>

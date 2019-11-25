@@ -2,7 +2,6 @@
 //  local_search.cpp
 //  Given an initial partition, form each island candidate and return the log-posterior
 //  of each.
-//  Created by Sameer Deshpande on 4/12/19.
 //
 
 #include <stdio.h>

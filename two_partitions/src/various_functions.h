@@ -1,8 +1,6 @@
 /*
  * various_functions.h
  *
- *  Created on: January 23, 2018
- *      Author: Sameer
  */
 
 

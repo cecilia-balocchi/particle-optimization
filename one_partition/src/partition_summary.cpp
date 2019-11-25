@@ -2,7 +2,6 @@
 //  partition_summary.cpp
 //  
 //
-//  Created by Sameer Deshpande on 6/12/19.
 //
 
 #include <stdio.h>

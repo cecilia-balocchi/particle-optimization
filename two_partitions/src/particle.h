@@ -1,8 +1,6 @@
 /*
  * particle.h
  *
- *  Created on: May 15, 2018
- *      Author: Cecilia
  */
 
 #ifndef PARTICLE_H_

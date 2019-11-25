@@ -1,8 +1,6 @@
 /*
  * particle_functions.cpp
  *
- *  Created on: May 20, 2018
- *      Author: Cecilia
  */
 
 

@@ -1,8 +1,6 @@
 /*
  * particle.cpp
  *
- *  Created on: May 15, 2018
- *      Author: Cecilia
  */
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]

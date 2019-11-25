@@ -1,8 +1,6 @@
 /*
  * partition_functions.cpp
  *
- *  Created on: Dec 29, 2017
- *      Author: Sameer
  */
 
 

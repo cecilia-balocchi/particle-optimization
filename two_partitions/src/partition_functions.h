@@ -1,8 +1,6 @@
 /*
  * partition_functions.h
  *
- *  Created on: Dec 30, 2017
- *      Author: Sameer
  */
 #include <RcppArmadillo.h>
 

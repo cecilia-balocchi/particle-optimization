@@ -1,8 +1,6 @@
 /*
  * particle_functions.h
  *
- *  Created on: May 20, 2018
- *      Author: Cecilia
  */
 
 int Particle_Equal(Particle *particle1, Particle *particle2);

@@ -1,4 +1,3 @@
-
 ## Overview
 
 The directory `src` contains an Rcpp implementation of the particle optimization procedure.

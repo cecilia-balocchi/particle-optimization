@@ -2,7 +2,6 @@
 //  map_cluster.cpp
 //  
 //
-//  Created by Sameer Deshpande on 4/7/19.
 //
 
 #include <stdio.h>
