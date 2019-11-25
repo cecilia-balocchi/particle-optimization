@@ -1310,8 +1310,8 @@ void Partition::Merge(int k_1, int k_2, bool A_or_B){
       log_det_Omegay[kk] = orig_log_det_Omegay[kk];
     } else if(kk > k_max){
       cluster_config[kk-1] = orig_cluster_config[kk];
-      clusters[kk-1] = new int[cluster_config[kk-1]];// ceci changed cluster_config[kk] into cluster_config[kk-1]
-      for(int i = 0; i < cluster_config[kk-1]; i++){ // ceci changed cluster_config[kk] into cluster_config[kk-1]
+      clusters[kk-1] = new int[cluster_config[kk-1]];// changed cluster_config[kk] into cluster_config[kk-1]
+      for(int i = 0; i < cluster_config[kk-1]; i++){ // changed cluster_config[kk] into cluster_config[kk-1]
         clusters[kk-1][i] = orig_clusters[kk][i];
       }
       log_prior[kk-1] = orig_log_prior[kk];
