@@ -9,7 +9,9 @@ X <- X - rowMeans(X)
 betas.mle <- numeric(n_tr)
 for(i in 1:n_tr)
   betas.mle[i] <- cov(Y[i,],X[i,])/var(X[i,])
-alphas.mle <- rowMeans(Y)
+alphas.mle <- rowMeans(Y) - log(2)
+# note we need to subtract log(2) because the inverse  hyperbolic since transformation (ihst) function use
+# did not have the shift factor "-log(2)". Instead of re-running the algorithm, we can shift the alpha found.
 
 phillypoly <- tracts
 polyfortified <- fortify(phillypoly)
@@ -17,10 +19,10 @@ p1 <- plot_borders_ggplot(rep(0, n_tr), phillypoly, w.sym, var = alphas.mle, pol
                     legend_name = "Mean\nlevel", palette_num = 3, map = googlemap)
 p2 <- plot_borders_ggplot(rep(0, n_tr), phillypoly, w.sym, var = betas.mle, polyfortified = polyfortified, legend = TRUE, 
                     legend_name = "Time\ntrend", palette_num = 5, map = googlemap)
-ggsave(filename = "alpha_mle", plot = p1, device = "png", path = "figures/",
-         width = 8, height = 8, units = "cm", scale = 1)
-ggsave(filename = "beta_mle", plot = p2, device = "png", path = "figures/",
-         width = 8, height = 8, units = "cm", scale = 1)
+ggsave(filename = "alpha_mle.png", plot = p1, device = "png", path = "figures/",
+         width = 2, height = 2, units = "cm", scale = 10)
+ggsave(filename = "beta_mle.png", plot = p2, device = "png", path = "figures/",
+         width = 2, height = 2, units = "cm", scale = 10)
 ## Strings should give the paths of the 4 output files from the Particle Optimization algorithm
 strings <- c("results/EPPrior5_0_tracts2_L10KMInitializeIS_opts02newhyper2_K6lambda100islandFIXED_kmrep.rdata",
              "results/UnifPrior_tracts2_L10KMInitializeIS_opts02newhyper2_K6lambda100islandFIXED_kmrep.rdata",
@@ -43,7 +45,7 @@ for(prior in 1:4){
     output_filename <-  "tract_unifep"
     plot_label <- "Uniform + EP prior"
   }
-  plot_list <- plot_particles_diff(input_string)
+  plot_list <- plot_particles_diff(input_string, alpha_shift= -log(2))
   ggsave(filename = paste0(output_filename, ".png"),
          plot = arrangeGrob(grobs = plot_list, nrow = 2, widths=c(rep(5/27,5),2/27),
                             left=textGrob(plot_label, rot = 90, gp = gpar(fontsize = 22))),
@@ -95,7 +97,7 @@ for(prior in 1:4){
   j <- which(tmp$w==max(tmp$w))
   partitionA <- tmp$particle_set_A[[j]]
   partitionB <- tmp$particle_set_B[[j]]
-  alphas[,i] <- tmp$alpha_particle[,j]
+  alphas[,i] <- tmp$alpha_particle[,j] - log(2)
   betas[,i] <- tmp$beta_particle[,j]
   z1 <- numeric(n_tr)
   for(k in 1:length(partitionA)){

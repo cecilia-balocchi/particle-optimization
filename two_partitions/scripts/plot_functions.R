@@ -156,7 +156,7 @@ plot_borders_ggplot_diff <- function(clusters_id, phillypoly, w.sym, diff_vec = 
 }
 
 ## Function that from the path of the output plots the three best particles and the difference plots
-plot_particles_diff <- function(strings){
+plot_particles_diff <- function(strings, alpha_shift = 0){
   # strings can be a vector of path strings if you want to combine more than one set of particles and
   # combine the best ones. We will use it with only one string
   # this code plots the best three (3) particles, with their differences in between. 
@@ -188,7 +188,7 @@ plot_particles_diff <- function(strings){
     cat(ii, " ", hh, " ", j, "\n")
     partitionA <- tmp$particle_set_A[[j]]
     partitionB <- tmp$particle_set_B[[j]]
-    alphas[,i] <- tmp$alpha_particle[,j]
+    alphas[,i] <- tmp$alpha_particle[,j] + alpha_shift
     betas[,i] <- tmp$beta_particle[,j]
     z1 <- numeric(n_tr)
     for(k in 1:length(partitionA)){
