@@ -53,6 +53,7 @@ public:
   void Partition_Merge(bool A_or_B, int k_1, int k_2);
   void Partition_Split_and_Merge(bool A_or_B, int split_k, int* new_cluster1, int* new_cluster2, int size1, int size2, int k_star_1, int k_star_2);
   void Partition_Modify(bool A_or_B, int cl_ind);
+  void Partition_Adjust(bool A_or_B);
 
   void Update_Partition(bool A_or_B, int current_l, std::vector<LPParticle> Particle_Set, std::vector<double> w, double lambda, double xi, bool restricted = false);
   void Update_Particle(int current_l, std::vector<LPParticle> Particle_Set, std::vector<double> w, double lambda, double xi, bool restricted = false); //done
@@ -83,8 +84,8 @@ public:
   bool Find_KM_Splits(bool A_or_B, int split_k, int num_splits, std::vector<std::vector<int> >& indices, std::vector<int>& ns, bool use_mle = false);
   void Find_TailSplit(bool A_or_B, int left0right2, int i, int split_k, std::vector<std::vector<int> > left_center_right, std::vector<std::vector<int> >& tail_conncomp, std::vector<std::vector<int> >& indices, std::vector<int>& ns);
   
-  void Initial_K_Splits(int num_splits_A, int num_splits_B, bool use_mle = false);
-  void Initial_KM_Splits(int num_splits_A, int num_splits_B, bool use_mle = false);
+  void Initial_K_Splits(int num_splits_A, int num_splits_B);
+  void Initial_KM_Splits(int num_splits);
   double param_bar(bool A_or_B, int k);
   void get_leftcenterright(bool A_or_B, std::vector<std::vector<int> >& left_center_right, int split_k);
   // void Partition_K_Splits(bool A_or_B, int cluster_id, int num_splits);

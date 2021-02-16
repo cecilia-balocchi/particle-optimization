@@ -62,17 +62,18 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
   const double lambda_input = 1.0, const double eta_input = 1.0, const double sigma_py_input = 0.0, const int max_iter_input = 10, 
   double a1_input = 0.01, double a2_input = 10, double b1_input = 0.001, double b2_input = 1,  
   double alpha_sigma_input = 0.5, double beta_sigma_input = 0.5, 
-  int opt_method_input = 0, int opt_Y_input = 1, int priorA_input = 0, int priorB_input = 0, bool Kmeans_initialize = false, int k_A = 0, int k_B = 0, 
-  Rcpp::Nullable<Rcpp::NumericVector> ks_A_ = R_NilValue, Rcpp::Nullable<Rcpp::NumericVector> ks_B_ = R_NilValue, //IntegerVector ks_A = 0, IntegerVector ks_B = 0, 
-  const double rho_input = 0.8, const double eps = 1e-3, double split_frac_input = 0.1, double A_or_B_first_input = 1.0,
-  bool resampling_input = false, Rcpp::List gamma_init_A = R_NilValue, Rcpp::List gamma_init_B = R_NilValue, 
+  int opt_method_input = 0, int opt_Y_input = 1, int prior_input = 0, bool Kmeans_initialize = false, int k_AB = 0,
+  Rcpp::Nullable<Rcpp::NumericVector> ks_ = R_NilValue, //IntegerVector ks_A = 0, IntegerVector ks_B = 0, 
+  const double rho_input = 0.8, const double eps = 1e-3, double split_frac_input = 0.1,
+  bool resampling_input = false, Rcpp::List gamma_init = R_NilValue,
   Rcpp::Nullable<Rcpp::NumericVector> w_init_ = R_NilValue, bool sampleA_input = true, bool sampleB_input = true, bool last_islands = false)
 {
-  priorA = priorA_input;
-  priorB = priorB_input;
+  // prior now needs to be the same!!
+  priorA = prior_input;
+  priorB = prior_input;
   opt_method = opt_method_input;
   opt_Y = opt_Y_input;
-  A_or_B_first = A_or_B_first_input;
+  A_or_B_first = 1.0;
   // We should not be using opt_Y = 0 anymore! (It computes LikelihoodYAB)
   if(opt_Y == 0){
     cout << "WARNING: opt_Y = 0 so LikelihoodYAB is used. Choose instead opt_Y = 1 for LikelihoodY " <<
@@ -81,6 +82,7 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
 
   Y = Y_input;
   X = X_input;
+
   // We should check that the data is actually normalized.
   bool X_orthogonal = is_orthogonal(X);
   if(X_orthogonal){
@@ -136,7 +138,6 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
   // (the Kmeans is made "spatial" by finding connected subclusters)
   // create a cdf with the log posterior values and sample L values
   // the particle elements are initialized with possibly different values
-
   LPParticle Gamma_0 = new Particle;
   if(Kmeans_initialize){
     cout << "Beginning Kmeans_initialize ";
@@ -145,45 +146,39 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
     beta_mle = new double[n];
     Gamma_0->get_alpha_beta_mle(alpha_mle, beta_mle);
     int Kmeans = (int)floor(log(n));
-    cout << "with k from 1 to Kmeans = " << Kmeans;
-    int Km_comb = Kmeans*Kmeans;
-    if(!((gamma_init_A.size() == 0) & (gamma_init_B.size() == 0))){
+    int Km_comb = Kmeans;
+    if(!(gamma_init.size() == 0)){
       // if we provide a starting point, let's add it to the Initial_Particle_Set 
       Km_comb++;
-      cout << " and a starting point.";
     }
-    cout << std::endl;
-    // Initial_Particle_Set contains all the combinations of kmeans partitions:
     vector<LPParticle> Initial_Particle_Set(Km_comb);
+    // arma::vec Log_post_prob = arma::zeros<vec>(Km_comb);
     std::vector<double> log_post_prob(Km_comb, 0.0);
     double tmp_log_post = 0.0;
     int l = 0;
     for(int i = 0; i < Kmeans; i++){
-      for(int j = 0; j < Kmeans; j++){
-        Initial_Particle_Set[l] = new Particle(Gamma_0);
-        Initial_Particle_Set[l]->Initial_KM_Splits(i+1, j+1);
-        tmp_log_post = Initial_Particle_Set[l]->Total_Log_Post();
-        log_post_prob[l] = tmp_log_post;
-        if(l == 0){
-          max_log_post = tmp_log_post;
-        } else {
-          if(tmp_log_post > max_log_post){
-            max_log_post = tmp_log_post;
-          }
-        }
-        l++;
-      }
-    }
-    if(!((gamma_init_A.size() == 0) & (gamma_init_B.size() == 0))){
       Initial_Particle_Set[l] = new Particle(Gamma_0);
-      Initial_Particle_Set[l]->Initialize_Particle(n, gamma_init_A, gamma_init_B);
+      Initial_Particle_Set[l]->Initial_KM_Splits(i+1);
+      tmp_log_post = Initial_Particle_Set[l]->Total_Log_Post();
+      log_post_prob[l] = tmp_log_post;
+      if(l == 0){
+        max_log_post = tmp_log_post;
+      } else {
+        if(tmp_log_post > max_log_post){
+          max_log_post = tmp_log_post;
+        }
+      }
+      l++;
+    }
+    if(!(gamma_init.size() == 0)){
+      Initial_Particle_Set[l] = new Particle(Gamma_0);
+      Initial_Particle_Set[l]->Initialize_Particle(n, gamma_init, gamma_init);
       tmp_log_post = Initial_Particle_Set[l]->Total_Log_Post();
       log_post_prob[l] = tmp_log_post;
       if(tmp_log_post > max_log_post){
         max_log_post = tmp_log_post;
       }
     }
-    // create now the cdf
     std::vector<double> post_prob(Km_comb,0.0);
     std::vector<double> cdf(Km_comb,0.0);
     double tmp_sum = 0.0;
@@ -198,25 +193,9 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
       cdf[ix] /= tmp_sum ; // normalizes the CDF
     }
 
-    // print
     std::vector<int> possible_ix;
     double unif = 0.0;
     int gamma_ix = 0;
-    // cout << "max_log_post = " << max_log_post << std::endl;
-    
-    // cout << "Log-post is : ";
-    // for(size_t ix = 0; ix < Km_comb; ix++) cout << " " << log_post_prob[ix];
-    // cout << std::endl << std::endl;
-    
-    cout << "posterior is : ";
-    for(size_t ix = 0; ix < Km_comb; ix++) cout << " " << post_prob[ix];
-    cout << std::endl << std::endl;
-    
-    // cout << "cdf if : ";
-    // for(size_t ix = 0; ix < Km_comb; ix++) cout << " " << cdf[ix];
-    // cout << std::endl << std::endl;
-    
-    // sample the L starting points of the particle set
     for(int l  = 0; l < L; l++){
       unif = R::runif(0.0, 1.0);
       possible_ix.clear();
@@ -230,22 +209,21 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
         gamma_ix = possible_ix[possible_ix.size() - 1] + 1; // cdf[gamma_ix] < unif < cdf[gamma_ix + 1]
       }
       Particle_Set[l] = new Particle(Initial_Particle_Set[gamma_ix]);
-      
-      cout << "l = " << l << " unif = " << unif << " gamma_ix = " << gamma_ix << std::endl;
+    
+      Rcpp::Rcout << "l = " << l << "unif = " << unif << " gamma_ix = " << gamma_ix << std::endl;
     }
     for(int i = 0; i < Km_comb; i++){
       delete Initial_Particle_Set[i];
     }
-    cout << "Initialized with Kmeans." << endl << endl;
+    cout << "Initialized with Kmeans." << endl;
   } else {
-    // if no starting point are provided, just initialize with one cluster
-    if((gamma_init_A.size() == 0) & (gamma_init_B.size() == 0)){
+    if(gamma_init.size() == 0){
       Gamma_0->Initialize_Particle(n);
       alpha_mle = new double[n];
       beta_mle = new double[n];
       Gamma_0->get_alpha_beta_mle(alpha_mle, beta_mle);
     } else {
-      Gamma_0->Initialize_Particle(n, gamma_init_A, gamma_init_B);
+      Gamma_0->Initialize_Particle(n, gamma_init, gamma_init);
       cout << "Initialized with custom partition." << endl;
       // alpha_mle and beta_mle need a partition where everyone is in one cluster
       LPParticle Gamma_1 = new Particle;
@@ -255,9 +233,8 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
       Gamma_1->get_alpha_beta_mle(alpha_mle, beta_mle);
       delete Gamma_1;
     }
-    // if we need to do some additional splits
-    if((k_A > 1) || (k_B > 1)){
-      Gamma_0->Initial_KM_Splits(k_A, k_B);
+    if(k_AB > 1){
+      Gamma_0->Initial_KM_Splits(k_AB);
       cout << "Starting point: KM_Splits" << endl;
       Gamma_0->Print_Particle();
     }
@@ -266,24 +243,24 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
     }
     bool multiple_splits = false;
     std::vector<int> ksA(L,0);
-    std::vector<int> ksB(L,0);
-    if (ks_A_.isNotNull()) {
-      NumericVector ks_A(ks_A_.get());
+    // std::vector<int> ksB(L,0);
+    if (ks_.isNotNull()) {
+      NumericVector ks_A(ks_.get());
       multiple_splits = true;
       for(int l = 0; l < L; l++){
         ksA[l] = ks_A[l];
       }
     }
-    if (ks_B_.isNotNull()) {
-      NumericVector ks_B(ks_B_.get());
-      multiple_splits = true;
-      for(int l = 0; l < L; l++){
-        ksB[l] = ks_B[l];
-      }
-    }
+    // if (ks_B_.isNotNull()) {
+    //   NumericVector ks_B(ks_B_.get());
+    //   multiple_splits = true;
+    //   for(int l = 0; l < L; l++){
+    //     ksB[l] = ks_B[l];
+    //   }
+    // }
     if(multiple_splits){
       for(int l = 0; l < L; l++){
-        Particle_Set[l]->Initial_KM_Splits(ksA[l], ksB[l]);
+        Particle_Set[l]->Initial_KM_Splits(ksA[l]);
       }
       cout << "Starting point: Different KM_Splits" << endl;
     }
@@ -364,11 +341,6 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
       objective += w[l] * Particle_Set[l]->Total_Log_Post();
     }
 
-    // cout << endl;
-    // cout << "[ensm_partition]: obj = " << setprecision(8) << objective << "    old_obj = " << setprecision(8) << old_objective << endl;
-    // cout << "[ensm_partition]: percent increase in objective = " << setprecision(6) << 100*fabs((objective - old_objective)/old_objective) << endl;
-    // cout << "[ensm_partition]: number of stationary particles = " << conv_counter << endl;
-    // cout << "[ensm_partition]: importance weights :  " << endl;
     cout << "[ensm_partition]: importance weights :  ";
     for(int l = 0; l < L; l++){
       cout << setprecision(6) << w[l] << "   " ;
@@ -389,7 +361,6 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
   delete old_particle;
   // this is to check all islands before ending the algorithm
   if(last_islands){
-    cout << "Beginning last_islands - ";
     bool A_or_B;
     LPParticle max_candidate;
     double max_objective;
@@ -415,15 +386,14 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
       objective += w[l] * Particle_Set[l]->Total_Log_Post();
     }
     if(objective > old_objective){
-      cout << "Objective increased with last_islands" << std::endl;
+      cout << "Objective increased with last_islands" << endl;
     }
-    cout << " - Finished last_islands." << std::endl;
   }
   
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
 
-  
+
   // prepare the output containers
   Rcpp::List tmp_list;
   arma::vec tmp_vec = arma::zeros<vec>(1);
@@ -521,8 +491,6 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
       p_star[ul] /= tmp_norm;
     }
   }
-  
-
 
 
   for(int l = 0; l < L; l++){
@@ -538,7 +506,7 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
   results["unik_index"] = unik_index; // new
   results["particle_assignment"] = particle_assignment; // new
   results["alpha_particle"] = alpha_particle;
-  results["beta_particle"] = beta_particle;
+	results["beta_particle"] = beta_particle;
   results["log_posterior"] = log_posterior;
   results["log_likelihood"] = log_likelihood;
   results["hyper_parameters"] = hyper_par;

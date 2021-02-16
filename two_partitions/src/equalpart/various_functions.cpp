@@ -1,5 +1,6 @@
 /*
  * various_functions.cpp
+ *
  *  
  */
 #include <RcppArmadillo.h>

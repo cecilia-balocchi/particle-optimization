@@ -772,13 +772,6 @@ void Partition::log_Dahl_cohes(int* sigma){
   return;
 }
 
-void Partition::Get_Likelihood(bool A_or_B){
-  for(int k = 0; k < K; k++){
-    get_likelihood(A_or_B,k);
-  }
-  return;
-}
-
 void Partition::get_likelihood(bool A_or_B, int cluster_id){
   int T = Y.n_cols;
   rowvec x = X.row(0);

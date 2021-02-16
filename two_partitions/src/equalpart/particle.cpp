@@ -5,9 +5,6 @@
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 
-#include <Rcpp.h>
-using namespace Rcpp;
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -765,6 +762,38 @@ void Particle::Partition_Modify(bool A_or_B, int cl_ind){
   }
 }
 
+void Particle::Partition_Adjust(bool A_or_B){
+  LPPartition partition, partition_ref;
+  // if we have modified A before, now we adjust B
+  if(A_or_B == true){
+    partition_ref = partition_A;
+    partition = partition_B;
+  } else {
+    partition_ref = partition_B;
+    partition = partition_A;
+  }
+  A_or_B = !A_or_B;
+
+  // delete partition;
+  // partition = new Partition(partition_ref, A_or_B);
+  partition->Copy_Partition(partition_ref, A_or_B);
+  for(int k = 0; k < partition->K; k++){
+    partition->get_likelihood(A_or_B, k);
+  }
+  if(opt_method == 0){
+    for(int k = 0; k < partition->K; k++){
+      get_parameter(A_or_B, k);
+    }
+  } else if(opt_method == 1){
+    // optimize alpha_beta given the two partitions
+    get_alpha_beta();
+  } else if(opt_method == 2){
+    // optimize alpha_beta given the two partitions, by doing coordinate ascend
+    get_alpha_beta_iter();
+  }
+  return;
+}
+
 // find splits needs more work, because of all the computation
 // same for ksplits
 
@@ -780,24 +809,17 @@ void Particle::Update_Partition(bool A_or_B, int current_l, std::vector<LPPartic
   }
   if(!restricted){
     // Islands - 5% in each cluster
-    // cout << "before island" << endl;
     Island_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
-    // cout << "before border" << endl;
     Border_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
     // Merges: Sweep over all clusters and find the ones that are adjacent
-    // cout << "before merge" << endl;
     Merge_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
     // we will loop over the clusters, run spectral clustering on the beta_hat's within the cluster, and propose various split and merge candidates
-    // cout << "before splitmerge" << endl;
     Spectral_SplitMerge_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
     Spectral_SplitMerge_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str, true);
-    // cout << "before tailsplit" << endl;
     Tail_Split_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
   }
-  // cout << "before km" << endl;
   KM_SplitMerge_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str);
   KM_SplitMerge_moves(A_or_B, &max_objective, current_l, max_candidate, Particle_Set, w, lambda, xi, &max_str, true);
-  // cout << "after km" << endl;
   Copy_Particle(max_candidate);
   cout << max_str << " " << max_objective << " ";
   if(!A_or_B){
@@ -917,7 +939,6 @@ std::vector<int> Particle::get_tail_jstar(bool A_or_B, int split_k, std::vector<
 }
 
 void Particle::Island_moves(bool A_or_B, double *pointer_to_maxobjective, int current_l, LPParticle& max_candidate, std::vector<LPParticle> Particle_Set, std::vector<double> w, double lambda, double xi, string *pt_maxstr, double percentage){
-  // cout << "START ISLAND" << endl;
   LPPartition partition;
   double* parameter;
   if(A_or_B){
@@ -929,14 +950,9 @@ void Particle::Island_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
   }
   double tmp_objective = 0.0; 
   int split_k, size1, size2;
-  // int* new_cluster1;
-  // int* new_cluster2;
-  // new_cluster1 = new int[1];
-  // new_cluster2 = new int[1];
   LPParticle tmp_candidate = new Particle(this);
   
   for(int k = 0; k < partition->K; k++){
-    // cout << "*Start cluster " << k << endl;
     // find which elements are in the top - bottom 5%
     if(partition->cluster_config[k] > 1){
       
@@ -946,38 +962,28 @@ void Particle::Island_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
       }
       sort(beta_hat_copy, beta_hat_copy + partition->cluster_config[k]);
       int threshold = (int) ceil(partition->cluster_config[k] * percentage);
-      // std::vector<int> index_topbottom(2*threshold);
       std::vector<int> index_topbottom;
       index_topbottom.reserve(2*threshold);
-      // int *index_topbottom = new int[2*threshold];
-      // int count = 0;
       for(int i = 0; i < threshold; i++){
         for(int j = 0; j < partition->cluster_config[k]; j++){
           if(parameter[ partition->clusters[k][j] ] == beta_hat_copy[i]){
             index_topbottom.push_back(partition->clusters[k][j]);
-            // count ++;
           }
         }
         for(int j = 0; j < partition->cluster_config[k]; j++){
           if(parameter[ partition->clusters[k][j] ] == beta_hat_copy[(partition->cluster_config[k])-1-i]){
             index_topbottom.push_back(partition->clusters[k][j]);
-            // count ++;
           }
         }
       }
 
       // index_topbottom contains the index in the whole city like {1, ..255}, not the index in the cluster
       delete[] beta_hat_copy;
-      // cout << "*Done index - 2*threshold: " << 2*threshold << " and index_topbottom.size() " << index_topbottom.size() << endl;
       for(int c = 0; c < 2*threshold; c++){
-        // cout << "**Start element " << c << endl;
         int i = index_topbottom[c];
-        // cout << "after i" << endl;
         split_k = k;
         delete tmp_candidate; // delete the old value of tmp_candidate .. i can either use Copy_Partition or do a delete[] and new call
-        // cout << "after delete tmp_candidate" << endl;
         tmp_candidate = new Particle(this);
-        // cout << "after new Particle" << endl;
         size1 = partition->cluster_config[split_k] - 1; 
         size2 = 1;
         std::vector<int> new_cluster1;
@@ -992,6 +998,7 @@ void Particle::Island_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
         // now actually perform the split
         tmp_candidate->Partition_Split(A_or_B, split_k, new_cluster1, new_cluster2, size1, size2);
         tmp_candidate->Partition_Modify(A_or_B, split_k);
+        tmp_candidate->Partition_Adjust(A_or_B);
         tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
         if(tmp_objective > *pointer_to_maxobjective){
           delete max_candidate;
@@ -1008,9 +1015,6 @@ void Particle::Island_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
     }
   }
   delete tmp_candidate;
-  // delete[] new_cluster1;
-  // delete[] new_cluster2;
-  // cout << "END ISLAND" << endl;
   return;
 }
 
@@ -1085,8 +1089,8 @@ void Particle::Border_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
           
           tmp_candidate->Partition_Split_and_Merge(A_or_B, split_k, new_cluster1, new_cluster2, size1, size2, k_star_1, k_star_2);
           tmp_candidate->Partition_Modify(A_or_B, split_k);
+          tmp_candidate->Partition_Adjust(A_or_B);
           tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
-          // cout << tmp_objective << endl;
           if(tmp_objective > *pointer_to_maxobjective){
             delete max_candidate;
             try{
@@ -1109,7 +1113,6 @@ void Particle::Border_moves(bool A_or_B, double *pointer_to_maxobjective, int cu
 }
 
 void Particle::Merge_moves(bool A_or_B, double *pointer_to_maxobjective, int current_l, LPParticle& max_candidate, std::vector<LPParticle> Particle_Set, std::vector<double> w, double lambda, double xi, string *pt_maxstr){
-  // cout << "START MERGE" << endl;
   LPPartition partition;
   // double* parameter;
   if(A_or_B){
@@ -1128,7 +1131,6 @@ void Particle::Merge_moves(bool A_or_B, double *pointer_to_maxobjective, int cur
   if(partition->K > 1){ // only makes sense to merge clusters if there are at least 2
     for(int k = 0; k < partition->K - 1 ; k++){
       for(int kk = k+1; kk < partition->K; kk++){
-        // cout << "Start Clusters " << k << " and " << kk << endl;
         tmp_A = Submatrix(A_block, partition->cluster_config[k], partition->cluster_config[kk], partition->clusters[k], partition->clusters[kk]);
         // check if any element of tmp_A is equal to
         adj_clusters = any(vectorise(tmp_A == 1.0));
@@ -1136,12 +1138,9 @@ void Particle::Merge_moves(bool A_or_B, double *pointer_to_maxobjective, int cur
           delete tmp_candidate;
           tmp_candidate = new Particle(this);
           
-          // cout << "before merge" << endl;
           tmp_candidate->Partition_Merge(A_or_B,k,kk);
-          // cout << "after merge" << endl;
+          tmp_candidate->Partition_Adjust(A_or_B);
           tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
-          // cout << "after tmp_objective" << endl;
-          // cout << tmp_objective << endl;
           if(tmp_objective > *pointer_to_maxobjective){
             delete max_candidate;
             try{
@@ -1154,12 +1153,10 @@ void Particle::Merge_moves(bool A_or_B, double *pointer_to_maxobjective, int cur
             *pt_maxstr = "Merge";
           } // closes if statement that updates max_candidate
         } // closes if statement that proposes the merge
-        // cout << "Start Clusters " << k << " and " << kk << endl;
       } // closes inner loop over remaining clusters
     } // closes outer loop over clusters
   }
   delete tmp_candidate;
-  // cout << "END MERGE" << endl;
   return;
 }
 
@@ -1194,6 +1191,7 @@ void Particle::Spectral_SplitMerge_moves(bool A_or_B, double *pointer_to_maxobje
           tmp_objective = 0.0;
           // now just try splitting
           tmp_candidate->Find_K_SpectralSplits(A_or_B, split_k, num_splits, indices, ns, use_mle);
+          tmp_candidate->Partition_Adjust(A_or_B);
           tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
 
           if(tmp_objective > *pointer_to_maxobjective){
@@ -1221,6 +1219,7 @@ void Particle::Spectral_SplitMerge_moves(bool A_or_B, double *pointer_to_maxobje
                 tmp_candidate = new Particle(this);
                 tmp_candidate->Partition_KSplit(A_or_B, split_k, indices, ns);
                 tmp_candidate->Partition_Merge(A_or_B, to_be_merged, jstar[j]);
+                tmp_candidate->Partition_Adjust(A_or_B);
                 tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
                 if(tmp_objective > *pointer_to_maxobjective){
                   delete max_candidate;
@@ -1276,6 +1275,7 @@ void Particle::KM_SplitMerge_moves(bool A_or_B, double *pointer_to_maxobjective,
         tmp_objective = 0.0;
         // now just try splitting
         tmp_candidate->Find_KM_Splits(A_or_B, split_k, num_splits, indices, ns, use_mle);
+        tmp_candidate->Partition_Adjust(A_or_B);
         tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
 
         if(tmp_objective > *pointer_to_maxobjective){
@@ -1304,6 +1304,7 @@ void Particle::KM_SplitMerge_moves(bool A_or_B, double *pointer_to_maxobjective,
               tmp_candidate = new Particle(this);
               tmp_candidate->Partition_KSplit(A_or_B, split_k, indices, ns);
               tmp_candidate->Partition_Merge(A_or_B, to_be_merged, jstar[j]);
+              tmp_candidate->Partition_Adjust(A_or_B);
               tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
               if(tmp_objective > *pointer_to_maxobjective){
                 delete max_candidate;
@@ -1366,6 +1367,7 @@ void Particle::Tail_Split_moves(bool A_or_B, double *pointer_to_maxobjective, in
         delete tmp_candidate;
         tmp_candidate = new Particle(this);
         tmp_candidate->Find_TailSplit(A_or_B, 0, i, split_k, left_center_right, left_conncomp, indices, ns);
+        tmp_candidate->Partition_Adjust(A_or_B);
         tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
         if(tmp_objective > *pointer_to_maxobjective){
           delete max_candidate;
@@ -1388,6 +1390,7 @@ void Particle::Tail_Split_moves(bool A_or_B, double *pointer_to_maxobjective, in
               tmp_candidate = new Particle(this);
               tmp_candidate->Partition_KSplit(A_or_B, split_k, indices, ns);
               tmp_candidate->Partition_Merge(A_or_B, to_be_merged, left_k_star[j]);
+              tmp_candidate->Partition_Adjust(A_or_B);
               tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
               if(tmp_objective > *pointer_to_maxobjective){
                 delete max_candidate;
@@ -1412,6 +1415,7 @@ void Particle::Tail_Split_moves(bool A_or_B, double *pointer_to_maxobjective, in
         delete tmp_candidate;
         tmp_candidate = new Particle(this);
         tmp_candidate->Find_TailSplit(A_or_B, 2, i, split_k, left_center_right, right_conncomp, indices, ns);
+        tmp_candidate->Partition_Adjust(A_or_B);
         tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
         if(tmp_objective > *pointer_to_maxobjective){
           delete max_candidate;
@@ -1433,6 +1437,7 @@ void Particle::Tail_Split_moves(bool A_or_B, double *pointer_to_maxobjective, in
               tmp_candidate = new Particle(this);
               tmp_candidate->Partition_KSplit(A_or_B, split_k, indices, ns);
               tmp_candidate->Partition_Merge(A_or_B, to_be_merged, right_k_star[j]);
+              tmp_candidate->Partition_Adjust(A_or_B);
               tmp_objective = w[current_l]*tmp_candidate->Total_Log_Post() + lambda * Entropy(current_l, tmp_candidate, Particle_Set, w) + xi * VI_Avg(current_l, tmp_candidate, Particle_Set);
               if(tmp_objective > *pointer_to_maxobjective){
                 delete max_candidate;
@@ -1451,36 +1456,11 @@ void Particle::Tail_Split_moves(bool A_or_B, double *pointer_to_maxobjective, in
 }
 
 void Particle::Update_Particle(int current_l, std::vector<LPParticle> Particle_Set, std::vector<double> w, double lambda, double xi, bool restricted){
-  if(A_or_B_first == 1.0){
-    if(sampleA){
-      Update_Partition(1, current_l, Particle_Set, w, lambda, xi, restricted);  
-    }
-    if(sampleB){
-      Update_Partition(0, current_l, Particle_Set, w, lambda, xi, restricted);  
-    }
-  } else if(A_or_B_first == 0.0){
-    if(sampleB){
-      Update_Partition(0, current_l, Particle_Set, w, lambda, xi, restricted);  
-    }
-    if(sampleA){
-      Update_Partition(1, current_l, Particle_Set, w, lambda, xi, restricted);  
-    }
-  } else if(A_or_B_first == 0.5){
-    if(R::runif(0,1) < 0.5){
-      if(sampleA){
-        Update_Partition(1, current_l, Particle_Set, w, lambda, xi, restricted);  
-      }
-      if(sampleB){
-        Update_Partition(0, current_l, Particle_Set, w, lambda, xi, restricted);  
-      }
-    } else {
-      if(sampleB){
-        Update_Partition(0, current_l, Particle_Set, w, lambda, xi, restricted);  
-      }
-      if(sampleA){
-        Update_Partition(1, current_l, Particle_Set, w, lambda, xi, restricted);  
-      }
-    }
+  if(sampleA){
+    Update_Partition(1, current_l, Particle_Set, w, lambda, xi, restricted);  
+  }
+  if(sampleB){
+    Update_Partition(0, current_l, Particle_Set, w, lambda, xi, restricted);  
   }
   // alpha and beta are updated when we update the partition
 }
@@ -2126,24 +2106,24 @@ void Particle::Find_TailSplit(bool A_or_B, int left0right2, int i, int split_k, 
   return;
 }
 
-void Particle::Initial_K_Splits(int num_splits_A, int num_splits_B, bool use_mle){
+void Particle::Initial_K_Splits(int num_splits_A, int num_splits_B){
   std::vector<std::vector<int> > indices;
   std::vector<int> ns;
   if(num_splits_A > 1)
-    Find_K_SpectralSplits(1, 0, num_splits_A, indices, ns, use_mle);
+    Find_K_SpectralSplits(1, 0, num_splits_A, indices, ns);
   if(num_splits_B > 1)
-    Find_K_SpectralSplits(0, 0, num_splits_B, indices, ns, use_mle);
+    Find_K_SpectralSplits(0, 0, num_splits_B, indices, ns);
   return;
 }
 
 
-void Particle::Initial_KM_Splits(int num_splits_A, int num_splits_B, bool use_mle){
+void Particle::Initial_KM_Splits(int num_splits){
   std::vector<std::vector<int> > indices;
   std::vector<int> ns;
-  if(num_splits_A > 1)
-    Find_KM_Splits(1, 0, num_splits_A, indices, ns, use_mle);
-  if(num_splits_B > 1)
-    Find_KM_Splits(0, 0, num_splits_B, indices, ns, use_mle);
+  if(num_splits > 1){
+    Find_KM_Splits(1, 0, num_splits, indices, ns);
+    Partition_Adjust(1);
+  }
   return;
 }
 

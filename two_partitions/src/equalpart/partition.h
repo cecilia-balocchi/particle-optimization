@@ -52,7 +52,6 @@ public:
   void get_prior_all(int method, int* sigma);
   void get_prior_onlylogprior(int cluster_id, int method);
   void get_prior_onlycohesion(int method, int* sigma);
-  void Get_Likelihood(bool A_or_B);
   void get_likelihood(bool A_or_B, int cluster_id);
 	void beta_postmean(int cluster_id);
 	void Print_Partition();
