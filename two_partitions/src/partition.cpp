@@ -781,28 +781,26 @@ void Partition::Get_Likelihood(bool A_or_B){
 
 void Partition::get_likelihood(bool A_or_B, int cluster_id){
   int T = Y.n_cols;
-  rowvec x = X.row(0);
   double c1,c2;
-  double txx;
+  
   if(A_or_B){
     c1 = a1;
     c2 = a2;
-    txx = T;
   } else {
     c1 = b1;
     c2 = b2;
-    rowvec x2 = pow(x,2);
-    txx = sum(x2);
   }
   int cluster_size = cluster_config[cluster_id];
   mat E = eye<mat>(cluster_size,cluster_size);
   mat Omega_k = zeros<mat>(cluster_size,cluster_size);
   mat O_k, A_block_k, D, M;
   mat Y_k = zeros<mat>(cluster_size,T);
+  mat X_k = zeros<mat>(cluster_size,T);
   // Omega is the inverse of the covariance matrix of the parameter (for one cluster)
   if(cluster_size == 1){
     Omega_k(0,0) = 1/(c1/(1-rho)+c2);
     Y_k = Y.row(clusters[cluster_id][0]);
+    X_k = X.row(clusters[cluster_id][0]);
   } else {
     O_k = ones<mat>(cluster_size,cluster_size);
     // Creating M: the precision matrix of the CAR model
@@ -816,6 +814,7 @@ void Partition::get_likelihood(bool A_or_B, int cluster_id){
     for(int i = 0; i < cluster_size; i++){
       M(i,i) += 1 - rho;
       Y_k.row(i) = Y.row(clusters[cluster_id][i]);
+      X_k.row(i) = X.row(clusters[cluster_id][i]);
     }
     // This is the Woodbury matrix identity for inversion
     // Omega_k = (M/c1) - (M/c1) * O_k * (M/c1) / (sum(sum(M))/c1 + 1/c2);
@@ -824,18 +823,21 @@ void Partition::get_likelihood(bool A_or_B, int cluster_id){
   }
   
   arma::vec XtY;
+  arma::mat tXX;
   if(A_or_B){
     XtY = sum(Y_k,1);
+    tXX = E * T;
   } else {
-    XtY = Y_k * x.t();
+    XtY = sum(Y_k%X_k,1);
+    tXX = diagmat(sum(X_k%X_k,1));
   }
-  mat P_k = inv_sympd(E*txx + Omega_k);
+  mat P_k = inv_sympd(tXX + Omega_k);
   quad_forms[cluster_id] = - as_scalar(XtY.t() * P_k * XtY);
   
   double Omega_log_det = 0;
   double Omega_log_det_sgn = 0;
   // Using Sylvester's + Woodbury determinant theorem: det(I + X Sigma Xt)^-1 = det(I - X P Xt) = det(I - P XtX) - so we need to multiply for 0.5
-  arma::mat Sigma_det = E - txx * P_k;
+  arma::mat Sigma_det = E - P_k * tXX;
   arma::log_det(Omega_log_det, Omega_log_det_sgn, Sigma_det);
   log_det_Omegay[cluster_id] = Omega_log_det;
   return;

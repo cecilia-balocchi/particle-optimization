@@ -29,7 +29,14 @@ ensm_givenhyperpar <- function(Y, X, A_block, L, max_iter,
 		warning("priorB should be a string `ep` for Ewens-Pitman or `unif` for the uniform.")
 	}
   	source("src/fun_likelihood.R")
-	X <- X - rowMeans(X)
+	Xorig <- X
+	Yorig <- Y
+	Xmeans <- rowMeans(X)
+	X <- X - Xmeans
+	betas_mle <- numeric(N)
+	for(i in 1:N)
+	betas_mle[i] <- cov(Y[i,],X[i,])/var(X[i,])
+	Y <- Y - betas_mle*Xmeans
 
 	om <- opt_method
 	oy <- opt_Y

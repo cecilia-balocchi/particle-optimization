@@ -1,26 +1,26 @@
 likelihood_cl <- function(part, k, A_or_B, a1, a2, b1, b2, rho, Y,X,A_block){
-  x <- X[1,]
   t <- dim(Y)[2]
-  if(A_or_B==1){
-    c1 = a1
-    c2 = a2
-    txx = t
-  } else {
-    c1 = b1
-    c2 = b2
-    txx = sum(x*x)
-  }
   cluster <- part[[k]]
   nk <- length(cluster)
   E = diag(nk)
   Omega_k = matrix(0, ncol = nk, nrow= nk)
-  Y_k = Y[cluster, ]
+  Y_k = Y[cluster, , drop=FALSE]
+  X_k = X[cluster, , drop=FALSE]
+  if(A_or_B==1){
+    c1 = a1
+    c2 = a2
+    tXX = t*E
+  } else {
+    c1 = b1
+    c2 = b2
+    tXX = diag(as.numeric(rowSums(X_k*X_k)), nrow = nk, ncol = nk)
+  }
   if(nk == 1){
     Omega_k[1,1] = 1/(c1/(1-rho)+c2)
     if(A_or_B == 1){
       XtY = sum(Y_k)
     } else {
-      XtY = sum(Y_k * x)
+      XtY = sum(Y_k * X_k)
     }
   } else {
     O_k = matrix(1, ncol =nk, nrow = nk)
@@ -31,11 +31,11 @@ likelihood_cl <- function(part, k, A_or_B, a1, a2, b1, b2, rho, Y,X,A_block){
     if(A_or_B == 1){
       XtY = rowSums(Y_k)
     } else {
-      XtY = rowSums(t(t(Y_k) * x))
+      XtY = rowSums(Y_k * X_k)
     }
   }
-  P_k = solve(E*txx + Omega_k)
-  Sigma_det = E - txx * P_k
+  P_k = solve(tXX + Omega_k)
+  Sigma_det = E - P_k * tXX
   
   quad_form = - as.numeric(t(XtY) %*% P_k %*% XtY)
   log_det = as.numeric(determinant(Sigma_det)$modulus)

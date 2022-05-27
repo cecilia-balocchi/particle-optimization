@@ -231,13 +231,7 @@ void Particle::Initialize_Particle_nclusters(int n){
 }
 
 void Particle::get_alpha_beta(){
-  // double a1 = 100;
-  // double a2 = 100;
-  // double b1 = 100;
-  // double b2 = 100;
-
   int T = Y.n_cols;
-  rowvec x = X.row(0);
 
   mat E = eye<mat>(nObs,nObs);
   mat O = ones<mat>(nObs,nObs);
@@ -306,7 +300,8 @@ void Particle::get_alpha_beta(){
     }
   }
 
-  rowvec x2 = pow(x,2);
+  arma::mat sumX = diagmat(sum(X,1));
+  arma::mat sumX2 = diagmat(sum(X%X,1));
 
   vec xty1 = sum(Y,1);
   vec xty2 = sum(X%Y,1);
@@ -317,11 +312,12 @@ void Particle::get_alpha_beta(){
   // mat P = inv_sympd(XtX + Sigma0inv); // this should be replaced with the block inversion formula
   mat P;
   if(opt_method == 1){
-    P = block_inverse_ret(E*T + Omega_a, E*sum(x), E*sum(x), E*sum(x2)+Omega_b, I11, I12, I21, I22);  
+    P = block_inverse_ret(E*T + Omega_a, sumX, sumX, sumX2+Omega_b, I11, I12, I21, I22);  
   } else {
     mat L11, L12, L21, L22;
-    P = block_inverse_ret(E*T + Omega_a, E*sum(x), E*sum(x), E*sum(x2)+Omega_b, &L11, &L12, &L21, &L22);  
+    P = block_inverse_ret(E*T + Omega_a, sumX, sumX, sumX2+Omega_b, &L11, &L12, &L21, &L22);  
   }
+  
   
   vec alpha_beta = P * XtY;
   
@@ -339,7 +335,6 @@ void Particle::get_alpha_beta_mle(double* alpha_mle, double* beta_mle){
   double b2 = 100;
 
   int T = Y.n_cols;
-  rowvec x = X.row(0);
 
   mat E = eye<mat>(nObs,nObs);
   mat O = ones<mat>(nObs,nObs);
@@ -408,7 +403,8 @@ void Particle::get_alpha_beta_mle(double* alpha_mle, double* beta_mle){
     }
   }
 
-  rowvec x2 = pow(x,2);
+  arma::mat sumX = diagmat(sum(X,1));
+  arma::mat sumX2 = diagmat(sum(X%X,1));
 
   vec xty1 = sum(Y,1);
   vec xty2 = sum(X%Y,1);
@@ -419,10 +415,10 @@ void Particle::get_alpha_beta_mle(double* alpha_mle, double* beta_mle){
   // mat P = inv_sympd(XtX + Sigma0inv); // this should be replaced with the block inversion formula
   mat P;
   if(opt_method == 1){
-    P = block_inverse_ret(E*T + Omega_a, E*sum(x), E*sum(x), E*sum(x2)+Omega_b, I11, I12, I21, I22);  
+    P = block_inverse_ret(E*T + Omega_a, sumX, sumX, sumX2+Omega_b, I11, I12, I21, I22);  
   } else {
     mat L11, L12, L21, L22;
-    P = block_inverse_ret(E*T + Omega_a, E*sum(x), E*sum(x), E*sum(x2)+Omega_b, &L11, &L12, &L21, &L22);  
+    P = block_inverse_ret(E*T + Omega_a, sumX, sumX, sumX2+Omega_b, &L11, &L12, &L21, &L22);  
   }
   
   vec alpha_beta = P * XtY;
@@ -449,22 +445,16 @@ void Particle::get_alpha_beta_iter(){
 }
 
 void Particle::get_parameter(bool A_or_B, int cluster_id){
-  // double a1 = 100;
-  // double a2 = 100;
-  // double b1 = 100;
-  // double b2 = 100;
-  
   if(A_or_B){
     int T = Y.n_cols;
     int cluster_size = partition_A->cluster_config[cluster_id];
-    rowvec x = X.row(0);
     double txx = T; // this is correct for A_or_B = 1
     
     if(cluster_size == 1){
       vec y_adj(T);
       for(int t = 0; t < T; t++){
         // y_adj(t) = Y(partition_A->clusters[cluster_id][0],t); // they are equivalent when X is orthogonal
-        y_adj(t) = Y(partition_A->clusters[cluster_id][0],t) - x(t)*beta[partition_A->clusters[cluster_id][0]];
+        y_adj(t) = Y(partition_A->clusters[cluster_id][0],t) - X(partition_A->clusters[cluster_id][0],t)*beta[partition_A->clusters[cluster_id][0]];
       }
       double Omega_beta_k = 1/(a1 + a2);
       
@@ -492,7 +482,7 @@ void Particle::get_parameter(bool A_or_B, int cluster_id){
       mat Y_adj = zeros<mat>(cluster_size,T);
       for(int i = 0; i < cluster_size; i++){
         // Y_adj.row(i) = Y.row(partition_A->clusters[cluster_id][i]); // they are equivalent when X is orthogonal
-        Y_adj.row(i) = Y.row(partition_A->clusters[cluster_id][i]) - x*beta[partition_A->clusters[cluster_id][i]];
+        Y_adj.row(i) = Y.row(partition_A->clusters[cluster_id][i]) - X.row(partition_A->clusters[cluster_id][i])*beta[partition_A->clusters[cluster_id][i]];
       }
       vec tXY = sum(Y_adj, 1);
       
@@ -506,22 +496,22 @@ void Particle::get_parameter(bool A_or_B, int cluster_id){
   } else {
     int T = Y.n_cols;
     int cluster_size = partition_B->cluster_config[cluster_id];
-    rowvec x = X.row(0);
-    double txx = as_scalar(x * x.t());
 
     if(cluster_size == 1){
       vec y_adj(T);
+      int i = partition_B->clusters[cluster_id][0];
       for(int t = 0; t < T; t++){
-        // y_adj(t) = Y(partition_B->clusters[cluster_id][0],t); // they are equivalent when X is orthogonal
-        y_adj(t) = Y(partition_B->clusters[cluster_id][0],t) - alpha[partition_B->clusters[cluster_id][0]];
+        // y_adj(t) = Y(i,t); // they are equivalent when X is orthogonal
+        y_adj(t) = Y(i,t) - alpha[i];
       }
       double Omega_beta_k = 1/(b1 + b2);
       
-      double tXY = as_scalar(x * y_adj);
-      beta[partition_B->clusters[cluster_id][0]] = 1/(txx + Omega_beta_k) * tXY;
+      double tXY = as_scalar(X.row(i) * y_adj);
+      double txx = as_scalar(X.row(i) * (X.row(i)).t());
+      beta[i] = 1/(txx + Omega_beta_k) * tXY;
     } else {
       mat O = ones<mat>(cluster_size, cluster_size);
-      mat E = eye<mat>(cluster_size, cluster_size);
+      // mat E = eye<mat>(cluster_size, cluster_size);
       mat A_block_k = Submatrix(A_block, cluster_size, cluster_size, partition_B->clusters[cluster_id], partition_B->clusters[cluster_id]);
       // get rowsums
       vec row_sums = zeros<vec>(cluster_size);
@@ -540,16 +530,17 @@ void Particle::get_parameter(bool A_or_B, int cluster_id){
       mat Sigma0inv = (M/b1) - ((1-rho)/b1)*((1-rho)/b1) / ( cluster_size*(1-rho)/b1 + 1/b2) * O;
       mat Y_adj = zeros<mat>(cluster_size,T);
       mat XtY = zeros<mat>(cluster_size,T);
+      mat tXX = eye<mat>(cluster_size, cluster_size);
       // this could change: we could have only the vector tXY and inside the loop..
       for(int i = 0; i < cluster_size; i++){
         // Y_adj.row(i) = Y.row(partition_B->clusters[cluster_id][i]); // they are equivalent when X is orthogonal
         Y_adj.row(i) = Y.row(partition_B->clusters[cluster_id][i]) - alpha[partition_B->clusters[cluster_id][i]];
-        XtY.row(i) = x % Y_adj.row(i);
+        XtY.row(i) = X.row(partition_B->clusters[cluster_id][i]) % Y_adj.row(i);
+        tXX(i,i) = sum( X.row(partition_B->clusters[cluster_id][i]) % X.row(partition_B->clusters[cluster_id][i]) );
         // here we could do tXY(i) = sum(x % Y_adj.row(i));
       }
       vec tXY = sum(XtY, 1);
       
-      mat tXX = E * txx;
       mat temp = inv_sympd(tXX + Sigma0inv);
       vec tmp_beta = temp * tXY;
       for(int i = 0; i < cluster_size; i++){
@@ -1503,13 +1494,12 @@ double Particle::Total_Log_Post(){
 
 double Particle::LikelihoodYAB(){
   int T = Y.n_cols;
-  rowvec x = X.row(0);
   double dof = nObs*T/2 + nObs; // sarebbe: + nObs/2 + nObs/2
   
   vec Y_vec = zeros<vec>(nObs*T);
   for(int i = 0; i < nObs; i++){
     for(int t = 0; t < T; t++){
-      Y_vec(i*T + t) = Y(i,t) - alpha[i] - x(t)*beta[i];
+      Y_vec(i*T + t) = Y(i,t) - alpha[i] - X(i,t)*beta[i];
     }
   }
   double quad_form = as_scalar(Y_vec.t() * Y_vec);
@@ -1589,8 +1579,6 @@ double Particle::LikelihoodYAB(){
 
 double Particle::LikelihoodY(){
   int T = Y.n_cols;
-  rowvec x = X.row(0);
-  rowvec x2 = pow(x,2);
   mat E = eye<mat>(nObs,nObs);
   mat O_k, A_block_k, Omega_k, D, M;
   mat Omega_a = zeros<mat>(nObs,nObs);
@@ -1657,6 +1645,9 @@ double Particle::LikelihoodY(){
       }
     }
   }
+  arma::mat sumX = diagmat(sum(X,1));
+  arma::mat sumX2 = diagmat(sum(X%X,1));
+
   mat P, P11, P12, P21, P22;
   if(opt_method == 1){
     P11 = *I11;
@@ -1665,7 +1656,7 @@ double Particle::LikelihoodY(){
     P22 = *I22;
     P = arma::join_cols(arma::join_rows(P11, P12),arma::join_rows(P21, P22));
   } else {
-    P = block_inverse_ret(E*T + Omega_a, E*sum(x), E*sum(x), E*sum(x2)+Omega_b, &P11, &P12, &P21, &P22);
+    P = block_inverse_ret(E*T + Omega_a, sumX, sumX, sumX2+Omega_b, &P11, &P12, &P21, &P22);
   }
   arma::vec xty1 = sum(Y,1);
   arma::vec xty2 = sum(X%Y,1);
@@ -1677,10 +1668,10 @@ double Particle::LikelihoodY(){
   double Omega_log_det = 0;
   double Omega_log_det_sgn = 0;
   // Using Sylvester's + Woodbury determinant theorem: det(I + X Sigma Xt)^-1 = det(I - X P Xt) = det(I - P XtX) - so we need to multiply for 0.5
-  arma::mat Sigma_det = arma::join_cols(arma::join_rows(E - (T*P11 + sum(x)*P12), -(sum(x)*P11+sum(x2)*P12)),arma::join_rows(-(T*P21 + sum(x)*P22), E-(sum(x)*P21+sum(x2)*P22)));
+  arma::mat Sigma_det = arma::join_cols(arma::join_rows(E - (T*P11 + P12*sumX), -(P11*sumX+P12*sumX2)),arma::join_rows(-(T*P21 + P22*sumX), E-(P21*sumX+P22*sumX2)));
   arma::log_det(Omega_log_det, Omega_log_det_sgn, Sigma_det);
   // potentially you can try the formula for block matrices
-  // Omega_log_det = block_log_det(E - (T*P11 + sum(x)*P12), -(sum(x)*P11+sum(x2)*P12), -(T*P21 + sum(x)*P22), E-(sum(x)*P21+sum(x2)*P22));
+  // Omega_log_det = block_log_det(E - (T*P11 + P12*sumX), -(P11*sumX+P12*sumX2)), -(T*P21 + P22*sumX), E-(P21*sumX+P22*sumX2));
 
 
   double numerator = lgamma(alpha_sigma +  ( (double) nObs * T/2)) + alpha_sigma * log(beta_sigma);

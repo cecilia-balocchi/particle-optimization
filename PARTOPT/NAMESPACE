@@ -1,0 +1,2 @@
+export("PARTOPT")
+useDynLib("PARTOPT")

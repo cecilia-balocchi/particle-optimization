@@ -28,7 +28,14 @@ summary_hyperpar <- function(Y, X, A_block,
   Rcpp::sourceCpp("src/particle_summary.cpp")
   source("src/fun_likelihood.R")
   
-  X <- X - rowMeans(X)
+  Xorig <- X
+  Yorig <- Y
+  Xmeans <- rowMeans(X)
+  X <- X - Xmeans
+  betas_mle <- numeric(N)
+  for(i in 1:N)
+  betas_mle[i] <- cov(Y[i,],X[i,])/var(X[i,])
+  Y <- Y - betas_mle*Xmeans
   eta_py = eta_input
   sigma_py = 0
   rho = rho_input
@@ -40,7 +47,7 @@ summary_hyperpar <- function(Y, X, A_block,
   betas_mle <- numeric(n_tr)
   for(i in 1:n_tr)
     betas_mle[i] <- cov(Y[i,],X[i,])/var(X[i,])
-  alphas_mle <- rowMeans(Y)
+  alphas_mle <- rowMeans(Y) - betas_mle * rowMeans(X) 
   sigmas <- numeric(n_tr)
   for(i in 1:n_tr)
     sigmas[i] <- sd(lm(Y[i,]~X[i,])$residuals)
