@@ -7,5 +7,5 @@ Author: Cecilia Balocchi and Sameer K. Deshpande
 Maintainer: Questions and comments to <sameer.deshpande@wisc.edu>
 Description: Implements the Particle Optimization for fitting simple linear models with spatially clustered intercepts and slopes that was proposed in Balocchi et al. (2022+). Full details of the material are available at https://arxiv.org/abs/1912.00111
 License: GNU GPL v3.0
-Depends: Rcpp (>= 1.0.8), RcppArmadillo
 LinkingTo: Rcpp, RcppArmadillo
+Imports: Rcpp
