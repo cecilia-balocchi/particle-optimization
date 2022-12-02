@@ -228,7 +228,7 @@ Rcpp::List ensm_cluster_mean(arma::mat Y_input, arma::mat X_input, const arma::m
     beta_mle = new double[n];
     Gamma_0->get_alpha_beta_mle(alpha_mle, beta_mle);
     
-    int Kmeans = (int)floor(log(n));
+    int Kmeans = (int)floor(eta*log(n));
     cout << "Beginning Kmeans_initialize ";
     cout << "with k from 1 to Kmeans = " << Kmeans;
     int Km_comb = Kmeans*Kmeans;
