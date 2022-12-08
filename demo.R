@@ -138,7 +138,7 @@ for(i in 1:N) Y[i,] <- rnorm(t, mean = alpha[i] + beta[i] * X[i,],
 library(Rcpp)
 library(RcppArmadillo)
 library(mcclust) # useful for metrics between partitions
-#library(PARTOPT)
+library(PARTOPT)
 
 L <- 5
 lam_10 <- PARTOPT(Y, X, W, L = L)
